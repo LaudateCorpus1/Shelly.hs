@@ -12,7 +12,8 @@
 -- However, Shelly went back to exposing a single module
 module Shelly.Base
   (
-    Sh(..), ShIO, runSh, State(..), ReadOnlyState(..), StdHandle(..), FilePath, Text,
+    Sh(..), ShIO, runSh, State(..), ReadOnlyState(..),
+    StdHandle(..), StdHandleId(..), FilePath, Text,
     relPath, path, absPath, canonic, canonicalize,
     test_d, test_s,
     unpack, gets, get, modify, trace,
@@ -121,6 +122,13 @@ data State = State
    , sErrExit :: Bool -- ^ should we exit immediately on any error
    , sReadOnly :: ReadOnlyState
    }
+
+-- | Used to select one of the three standard process handles
+data StdHandleId = InHandleId
+                 | OutHandleId
+                 | ErrorHandleId
+   deriving Eq
+
 
 data StdHandle = InHandle StdStream
                | OutHandle StdStream

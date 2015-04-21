@@ -25,6 +25,7 @@ module Shelly
          -- * Entering Sh.
          Sh, ShIO, shelly, shellyNoDir, shellyFailDir, asyncSh, sub
          , silently, verbosely, escaping, print_stdout, print_stderr, print_commands
+         , onCommandHandles
          , tracing, errExit
          , log_stdout_with, log_stderr_with
 
@@ -37,7 +38,7 @@ module Shelly
 
          -- * Running commands Using handles
          , runHandle, runHandles, transferLinesAndCombine, transferFoldHandleLines
-         , StdHandle(..), StdStream(..)
+         , StdHandle(..), StdHandleId(..), StdStream(..)
 
 
          -- * Modifying and querying environment.
@@ -88,7 +89,7 @@ module Shelly
 
 import Shelly.Base
 import Shelly.Find
-import Control.Monad ( when, unless, void, forM, filterM, liftM2 )
+import Control.Monad ( when, unless, void, forM, forM_, filterM, liftM2 )
 import Control.Monad.Trans ( MonadIO )
 import Control.Monad.Reader (ask)
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 706
@@ -753,6 +754,20 @@ get_env_def :: Text -> Text -> Sh Text
 get_env_def d = get_env >=> return . fromMaybe d
 {-# DEPRECATED get_env_def "use fromMaybe DEFAULT get_env" #-}
 
+-- | When running an external command, apply the given action to
+-- the specified handles for that command.
+-- This can for example be used to change the encoding of the
+-- handles or set them into binary mode.
+onCommandHandles :: [StdHandleId] -> (Handle -> IO ()) -> Sh a -> Sh a
+onCommandHandles handleIds handleAction a =
+    sub $ modify (\x -> x { sRun = applyAction (sRun x) }) >> a
+   where
+       applyAction underlyingRun handles st exe args = do
+          res@(inH, outH, errH, _) <- underlyingRun handles st exe args
+          liftIO $ do
+            forM_ [(InHandleId, inH), (OutHandleId, outH), (ErrorHandleId, errH)] $
+              \(handleId, h) -> when (handleId `elem` handleIds) $ handleAction h
+          return res
 
 -- | Create a sub-Sh in which external command outputs are not echoed and
 -- commands are not printed.
